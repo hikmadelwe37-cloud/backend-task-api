@@ -1,44 +1,65 @@
+const express = require('express');
+const mysql = require('mysql2');
+const cors = require('cors');
+require('dotenv').config();
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+// Connect to MySQL Database
+const db = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+db.connect((err) => {
+  if (err) {
+    console.error('Database connection failed:', err);
+    return;
+  }
+  console.log('MySQL connected');
+});
+
 // GET all tasks
 app.get('/api/tasks', (req, res) => {
-  res.json(tasks);
+  db.query('SELECT * FROM tasks', (err, results) => {
+    if (err) {
+      console.error('Database Error:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(results);
+  });
 });
+
 // POST a new task
 app.post('/api/tasks', (req, res) => {
-  const newTask = {
-    id: tasks.length + 1,
-    title: req.body.title,
-    completed: false
-  };
-
-  tasks.push(newTask);
-  res.status(201).json({ message: 'Task created successfully', newTask });
+  const { title } = req.body;
+  db.query('INSERT INTO tasks (title) VALUES (?)', [title], (err, result) => {
+    if (err) {
+      console.error('Database Error:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ id: result.insertId, title, completed: false });
+  });
 });
 
-// UPDATE a task by ID
-app.put('/api/tasks/:id', (req, res) => {
-  const taskId = parseInt(req.params.id);
-  const task = tasks.find(t => t.id === taskId);
-
-  if (!task) {
-    return res.status(404).json({ error: 'Task not found' });
-  }
-
-  // Update fields if provided in the request body
-  task.title = req.body.title !== undefined ? req.body.title : task.title;
-  task.completed = req.body.completed !== undefined ? req.body.completed : task.completed;
-
-  res.json({ message: 'Task updated successfully', task });
-});
-
-// DELETE a task by ID
+// DELETE a task
 app.delete('/api/tasks/:id', (req, res) => {
-  const taskId = parseInt(req.params.id);
-  const taskIndex = tasks.findIndex(t => t.id === taskId);
+  const { id } = req.params;
+  db.query('DELETE FROM tasks WHERE id = ?', [id], (err, result) => {
+    if (err) {
+      console.error('Database Error:', err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ message: 'Task deleted successfully' });
+  });
+});
 
-  if (taskIndex === -1) {
-    return res.status(404).json({ error: 'Task not found' });
-  }
-
-  const deletedTask = tasks.splice(taskIndex, 1);
-  res.json({ message: 'Task deleted successfully', deletedTask });
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server is running live on port ${PORT}`);
 });
